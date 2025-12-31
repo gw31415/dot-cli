@@ -1,105 +1,63 @@
 {
-  description = "dotfiles and configurations for ama";
+  description = "Management cli of github:gw31415/dotfiles";
 
   inputs = {
-    nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
-    nixpkgs-stable.url = "github:NixOS/nixpkgs/nixos-25.05";
-
-    flake-utils.url = "github:numtide/flake-utils";
-    home-manager = {
-      url = "github:nix-community/home-manager";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
-    nix-darwin = {
-      url = "github:LnL7/nix-darwin";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
-    nix-homebrew = {
-      url = "github:zhaofengli-wip/nix-homebrew";
-    };
-    neovim-nightly-overlay.url = "github:nix-community/neovim-nightly-overlay";
     fenix = {
       url = "github:nix-community/fenix";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+    flake-utils.url = "github:numtide/flake-utils";
+    nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
   };
 
   outputs =
-    { self, ... }@inputs:
-    let
-      env = import ./env.nix;
-    in
-    inputs.flake-utils.lib.eachDefaultSystem (
+    {
+      self,
+      fenix,
+      flake-utils,
+      nixpkgs,
+    }:
+    flake-utils.lib.eachDefaultSystem (
       system:
       let
-        pkgs = import inputs.nixpkgs {
+        pkgs = import nixpkgs {
           inherit system;
-          config.allowUnfree = true;
         };
-        pkgs-stable = import inputs.nixpkgs-stable {
-          inherit system;
-          config.allowUnfree = true;
+        toolchain = fenix.packages.${system}.fromToolchainFile {
+          file = ./rust-toolchain.toml;
+          sha256 = "18blq77d227zfgqwadk3zanlwlxp3i23pqpc11ck0yqf20p6dlgv";
         };
-        dot = import ./dot/default.nix {
-          inherit system;
-          pkgs = pkgs-stable;
-          fenix = ctx.fenix;
-        };
-        ctx = inputs // {
-          inherit
-            pkgs
-            pkgs-stable
-            system
-            dot
-            ;
-        };
-        overlays = [
-          inputs.neovim-nightly-overlay.overlays.default
-        ];
+        dot =
+          (
+            (pkgs.makeRustPlatform {
+              cargo = toolchain;
+              rustc = toolchain;
+            }).buildRustPackage
+            {
+              name = "dot";
+              src = ./.;
+              cargoLock.lockFile = ./Cargo.lock;
+              nativeBuildInputs = with pkgs; [
+                libgit2
+                pkg-config
+                openssl
+              ];
+            }
+          ).overrideAttrs
+            (old: {
+              OPENSSL_DIR = "${pkgs.openssl.dev}";
+              OPENSSL_LIB_DIR = "${pkgs.openssl.out}/lib";
+            });
       in
       {
         ########################################
         # Package sets
         ########################################
         packages = {
-          nix-darwin = ctx.nix-darwin.packages.${system}.default;
-
-          ########################################
-          # Darwin configuration with nix-homebrew
-          ########################################
-          darwinConfigurations.${env.hostname} = ctx.nix-darwin.lib.darwinSystem {
-            modules = [
-              ({ pkgs, ... }: import ./darwin.nix { inherit ctx; })
-              (ctx.nix-homebrew.darwinModules.nix-homebrew {
-                lib = ctx.nix-darwin.lib;
-                nix-homebrew = {
-                  enable = true;
-                  enableRosetta = true;
-                  user = env.username;
-                  autoMigrate = true;
-                };
-              })
-            ];
-          };
-          ########################################
-          # Home manager configuration
-          ########################################
-          homeConfigurations.${env.username} = ctx.home-manager.lib.homeManagerConfiguration {
-            inherit pkgs;
-            modules = [
-              (
-                { config, ... }:
-                import ./home.nix {
-                  inherit config ctx;
-                }
-              )
-              { nixpkgs.overlays = overlays; }
-            ];
-          };
-          default = ctx.dot;
+          default = dot;
         };
         apps = rec {
-          dot-app = ctx.flake-utils.lib.mkApp { drv = ctx.dot; };
+          dot-app = flake-utils.lib.mkApp { drv = dot; };
           default = dot-app;
         };
       }

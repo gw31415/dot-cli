@@ -1,5 +1,0 @@
-let s:venv = finddir('.venv/..', expand('%:p:h').';')
-if s:venv != ''
-	let s:venv = s:venv . '/.venv/bin/python'
-	" exe $"autocmd InsertEnter <buffer> ++once PyrightSetPythonPath {s:venv}/.venv/bin/python"
-endif
