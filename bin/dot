@@ -11,16 +11,24 @@
 # 初回インストールは install.sh を使用すること
 
 # --- ログ関数 ---
-function info;    echo "[INFO] $argv"; end
-function warn;    echo "[WARN] $argv" >&2; end
-function success; echo "[SUCCESS] $argv"; end
-function err;     echo "[ERROR] $argv" >&2; end
+function info
+    echo "[INFO] $argv"
+end
+function warn
+    echo "[WARN] $argv" >&2
+end
+function success
+    echo "[SUCCESS] $argv"
+end
+function err
+    echo "[ERROR] $argv" >&2
+end
 
 # argparse を呼ぶ前に引数の数を保存する
 # (引数なしの場合にデフォルトで home-manager switch を実行するために使用)
 set original_argc (count $argv)
 
-argparse 'u/update' 'h/home' 'd/darwin' 'a/all' -- $argv
+argparse u/update h/home d/darwin a/all -- $argv
 or begin
     err "Invalid arguments. Use -u, -h, -d, or -a."
     exit 1

@@ -7,11 +7,17 @@
 #                   (nix-collect-garbage -d)
 
 # --- ログ関数 ---
-function info;    echo "[INFO] $argv"; end
-function success; echo "[SUCCESS] $argv"; end
-function err;     echo "[ERROR] $argv" >&2; end
+function info
+    echo "[INFO] $argv"
+end
+function success
+    echo "[SUCCESS] $argv"
+end
+function err
+    echo "[ERROR] $argv" >&2
+end
 
-argparse 'aggressive' -- $argv
+argparse aggressive -- $argv
 or begin
     err "Invalid arguments. Use --aggressive for a thorough cleanup."
     exit 1

@@ -9,9 +9,15 @@
 # 二重起動を防ぐことができる
 
 # --- ログ関数 ---
-function info;   echo "[INFO] $argv"; end
-function warn;   echo "[WARN] $argv" >&2; end
-function err;    echo "[ERROR] $argv" >&2; end
+function info
+    echo "[INFO] $argv"
+end
+function warn
+    echo "[WARN] $argv" >&2
+end
+function err
+    echo "[ERROR] $argv" >&2
+end
 
 # --- config_home を決定 ---
 # XDG_CONFIG_HOME が設定されていればそれを使用、なければ ~/.config を使用
