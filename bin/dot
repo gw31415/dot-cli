@@ -1,7 +1,8 @@
 #!/usr/bin/env fish
 # dot.fish - dotfiles を Nix で管理するメインコマンド
 #
-# Usage: dot.fish [-u] [-h] [-d] [-a]
+# Usage: dot.fish [SUBCOMMAND] [-u] [-h] [-d] [-a]
+#   SUBCOMMAND    サブコマンド (gc など) を実行する
 #   -u, --update   flake.lock を最新の状態に更新する
 #   -h, --home     home-manager switch を実行する
 #   -d, --darwin   nix-darwin switch を実行する (macOS のみ)
@@ -27,6 +28,31 @@ end
 # argparse を呼ぶ前に引数の数を保存する
 # (引数なしの場合にデフォルトで home-manager switch を実行するために使用)
 set original_argc (count $argv)
+
+# --- サブコマンド処理 ---
+# 最初の引数がフラグ（-で始まる）でない場合はサブコマンドとして扱う
+if test $original_argc -gt 0; and not string match -q -- '-*' $argv[1]
+    set subcommand $argv[1]
+    set -e argv[1]
+
+    # スクリプトのディレクトリを取得
+    set script_dir (dirname (status --current-filename))
+    set local_subcommand "$script_dir/dot-$subcommand"
+    set path_subcommand "dot-$subcommand"
+
+    # 相対パスを優先、なければ PATH を探索
+    if test -f "$local_subcommand"; and test -x "$local_subcommand"
+        info "Running subcommand: $local_subcommand"
+        exec "$local_subcommand" $argv
+    else if command -q "$path_subcommand"
+        info "Running subcommand: $path_subcommand"
+        exec "$path_subcommand" $argv
+    else
+        err "Unknown subcommand: $subcommand"
+        err "Did you mean? dot-gc"
+        exit 1
+    end
+end
 
 argparse u/update h/home d/darwin a/all -- $argv
 or begin
