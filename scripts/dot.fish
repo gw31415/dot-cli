@@ -1,0 +1,105 @@
+#!/usr/bin/env fish
+# dot.fish - dotfiles を Nix で管理するメインコマンド
+#
+# Usage: dot.fish [-u] [-h] [-d] [-a]
+#   -u, --update   flake.lock を最新の状態に更新する
+#   -h, --home     home-manager switch を実行する
+#   -d, --darwin   nix-darwin switch を実行する (macOS のみ)
+#   -a, --all      home-manager と nix-darwin の両方を適用する
+#
+# 引数なしの場合は home-manager switch のみを実行する
+# 初回インストールは install.sh を使用すること
+
+# --- ログ関数 ---
+function info;    echo "[INFO] $argv"; end
+function warn;    echo "[WARN] $argv" >&2; end
+function success; echo "[SUCCESS] $argv"; end
+function err;     echo "[ERROR] $argv" >&2; end
+
+# argparse を呼ぶ前に引数の数を保存する
+# (引数なしの場合にデフォルトで home-manager switch を実行するために使用)
+set original_argc (count $argv)
+
+argparse 'u/update' 'h/home' 'd/darwin' 'a/all' -- $argv
+or begin
+    err "Invalid arguments. Use -u, -h, -d, or -a."
+    exit 1
+end
+
+# --- config_home を決定 ---
+# XDG_CONFIG_HOME が設定されていればそれを使用、なければ ~/.config を使用
+if set -q XDG_CONFIG_HOME
+    set config_home $XDG_CONFIG_HOME
+else
+    set config_home $HOME/.config
+end
+
+set home_manager_path $config_home/home-manager
+set flake_nix $home_manager_path/flake.nix
+
+# --- インストール確認 ---
+if not test -f $flake_nix
+    err "Not installed. To install, run install.sh first."
+    exit 1
+end
+
+# --- macOS 以外での --darwin フラグの警告 ---
+if set -q _flag_darwin; and test (uname) != Darwin
+    warn "nix-darwin is not supported on this system. Ignoring --darwin."
+    set -e _flag_darwin
+end
+
+# --- flake.lock を更新 ---
+if set -q _flag_update
+    info "Updating flake.lock..."
+
+    nix flake update --flake $home_manager_path --commit-lock-file
+    or begin
+        err "Failed to update flake.lock."
+        exit 1
+    end
+
+    success "Updated $home_manager_path/flake.lock."
+end
+
+# --- home-manager switch ---
+# 引数なし、または --home / --all が指定された場合に実行する
+if set -q _flag_home; or set -q _flag_all; or test $original_argc -eq 0
+    info "Switching home-manager..."
+
+    # home-manager がパスにない場合は nix path-info でストアパスを取得する
+    if command -q home-manager
+        set hm_bin home-manager
+    else
+        set nix_path (nix path-info nixpkgs#home-manager 2>/dev/null | string trim)
+        if test -n "$nix_path"
+            set hm_bin $nix_path/bin/home-manager
+        else
+            set hm_bin home-manager
+        end
+    end
+
+    cd $home_manager_path
+    $hm_bin switch
+    or begin
+        err "Failed to switch home-manager."
+        exit 1
+    end
+end
+
+# --- nix-darwin switch (macOS のみ) ---
+# --darwin または --all が指定されていて、かつ macOS の場合に実行する
+if test (uname) = Darwin
+    if set -q _flag_darwin; or set -q _flag_all
+        info "Switching darwin-rebuild..."
+
+        cd $home_manager_path
+        sudo nix run .#nix-darwin -- switch --flake .
+        or begin
+            err "Failed to switch darwin-rebuild."
+            exit 1
+        end
+    end
+end
+
+success "Success."

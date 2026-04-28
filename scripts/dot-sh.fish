@@ -1,0 +1,62 @@
+#!/usr/bin/env fish
+# dot-sh.fish - dotfiles の開発シェル (devShell) に入るコマンド
+#
+# Usage: dot-sh.fish [command...]
+#   引数なし:    $SHELL で指定されたシェルを devShell 内で起動する
+#   引数あり:    指定したコマンドを devShell 内で実行する
+#
+# 環境変数 DOT_DEVSHELL=1 を設定して nix develop を実行するため、
+# 二重起動を防ぐことができる
+
+# --- ログ関数 ---
+function info;   echo "[INFO] $argv"; end
+function warn;   echo "[WARN] $argv" >&2; end
+function err;    echo "[ERROR] $argv" >&2; end
+
+# --- config_home を決定 ---
+# XDG_CONFIG_HOME が設定されていればそれを使用、なければ ~/.config を使用
+if set -q XDG_CONFIG_HOME
+    set config_home $XDG_CONFIG_HOME
+else
+    set config_home $HOME/.config
+end
+
+set home_manager_path $config_home/home-manager
+set flake_nix $home_manager_path/flake.nix
+
+# --- インストール確認 ---
+if not test -f $flake_nix
+    err "Not installed. To install, run install.sh first."
+    exit 1
+end
+
+# --- 二重起動の防止 ---
+# DOT_DEVSHELL が設定済みの場合はすでに devShell 内にいるので終了する
+if test -n "$DOT_DEVSHELL"
+    warn "You are already in the devShell. Cancelled."
+    exit 1
+end
+
+info "Entering the devShell..."
+
+# --- 実行するコマンドを決定 ---
+# 引数がない場合は $SHELL (未設定なら /bin/bash) を起動する
+if test (count $argv) -eq 0
+    if test -n "$SHELL"
+        set cmd $SHELL
+    else
+        set cmd /bin/bash
+    end
+else
+    set cmd $argv
+end
+
+# --- devShell に入る ---
+# DOT_DEVSHELL=1 を環境変数に設定して nix develop を実行する
+# $cmd にはシェルまたはコマンドとその引数が入る
+cd $home_manager_path
+DOT_DEVSHELL=1 nix develop --impure -c $cmd
+set exit_code $status
+
+info "Exiting the devShell..."
+exit $exit_code
