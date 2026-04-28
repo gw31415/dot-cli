@@ -39,7 +39,8 @@ set flake_nix $home_manager_path/flake.nix
 
 # --- インストール確認 ---
 if not test -f $flake_nix
-    err "Not installed. To install, run install.sh first."
+    err "Not installed. To install, run dot-install first."
+    err "nix run github:gw31415/dot#install"
     exit 1
 end
 
