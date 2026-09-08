@@ -129,7 +129,9 @@ if test (uname) = Darwin
         info "Switching darwin-rebuild..."
 
         cd $home_manager_path
-        sudo nix run .#nix-darwin -- switch --flake .
+        # -H: sudo 先で HOME を /var/root にし、nix の
+        # "$HOME is not owned by you" 警告を出さない。
+        sudo -H nix run .#nix-darwin -- switch --flake .
         or begin
             err "Failed to switch darwin-rebuild."
             exit 1
